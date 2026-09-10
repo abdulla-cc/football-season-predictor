@@ -65,6 +65,10 @@ def load_pl_data(seasons):
         combined_df = pd.concat(all_data, ignore_index=True)
         # Remove matches that haven't been played yet (where goals are missing/NaN)
         combined_df = combined_df.dropna(subset=['FTHG', 'FTAG'])
+        combined_df['Date'] = pd.to_datetime(combined_df['Date'], dayfirst=True, format='mixed')
+        combined_df = combined_df.sort_values('Date').reset_index(drop=True)
+        combined_df['FTHG'] = combined_df['FTHG'].astype(int)
+        combined_df['FTAG'] = combined_df['FTAG'].astype(int)
         return standardize_teams(combined_df)
     else:
         return pd.DataFrame()
@@ -92,8 +96,70 @@ def load_promoted_teams_data(season="2025-2026", promoted_teams=["Coventry", "Ip
     
     promoted_df['Season'] = season
     promoted_df['League'] = 'Championship'
+    promoted_df = promoted_df.dropna(subset=['FTHG', 'FTAG'])
+    promoted_df['Date'] = pd.to_datetime(promoted_df['Date'], dayfirst=True, format='mixed')
+    promoted_df = promoted_df.sort_values('Date').reset_index(drop=True)
+    promoted_df['FTHG'] = promoted_df['FTHG'].astype(int)
+    promoted_df['FTAG'] = promoted_df['FTAG'].astype(int)
     
     return standardize_teams(promoted_df)
+
+def create_promoted_team_anchors(champ_df, promoted_teams=["Coventry", "Ipswich", "Hull"], baseline_opponent="Everton"):
+    """
+    Creates synthetic anchor matches for newly promoted teams based on their 
+    Championship performance shrunk to Premier League level.
+    This prevents the model from estimating 0 goals if a team had a slow 3-game start.
+    """
+    anchors = []
+    for team in promoted_teams:
+        h_m = champ_df[champ_df['HomeTeam'] == team]
+        a_m = champ_df[champ_df['AwayTeam'] == team]
+        total_games = len(h_m) + len(a_m)
+        if total_games == 0:
+            continue
+            
+        scored_per_game = (h_m['FTHG'].sum() + a_m['FTAG'].sum()) / total_games
+        conceded_per_game = (h_m['FTAG'].sum() + a_m['FTHG'].sum()) / total_games
+        
+        # Shrinkage factor: in the PL, promoted teams score ~35% fewer goals and concede ~35% more
+        adj_scored = max(1, int(round(scored_per_game * 0.65)))
+        adj_conceded = max(1, int(round(conceded_per_game * 1.35)))
+        
+        # Add 6 anchor matches (3 home, 3 away) against a baseline Premier League team
+        for _ in range(3):
+            anchors.append({
+                'Date': pd.to_datetime('2026-08-01'),
+                'HomeTeam': team,
+                'AwayTeam': baseline_opponent,
+                'FTHG': adj_scored,
+                'FTAG': adj_conceded,
+                'Season': '2026-2027-Prior',
+                'League': 'Premier League'
+            })
+            anchors.append({
+                'Date': pd.to_datetime('2026-08-01'),
+                'HomeTeam': baseline_opponent,
+                'AwayTeam': team,
+                'FTHG': adj_conceded,
+                'FTAG': adj_scored,
+                'Season': '2026-2027-Prior',
+                'League': 'Premier League'
+            })
+            
+    return pd.DataFrame(anchors)
+
+def get_complete_training_data(pl_seasons=["2025-2026", "2026-2027"]):
+    """
+    Returns the complete, ready-to-train dataset combining Premier League 
+    matches and seeded priors for promoted teams.
+    """
+    pl_df = load_pl_data(pl_seasons)
+    champ_df = load_promoted_teams_data()
+    anchors_df = create_promoted_team_anchors(champ_df)
+    
+    combined = pd.concat([pl_df, anchors_df], ignore_index=True)
+    combined = combined.sort_values('Date').reset_index(drop=True)
+    return combined
 
 if __name__ == "__main__":
     # Let's test loading both PL and Championship data

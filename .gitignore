@@ -4,3 +4,5 @@ __pycache__/
 .env
 data/
 .streamlit/
+frontend/node_modules/
+frontend/dist/

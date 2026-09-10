@@ -1,8 +1,9 @@
 import os
 import pandas as pd
 
-# The folder where our Premier League data is stored
-DATA_DIR = os.path.join("data", "PL DATA")
+# The folders where our data is stored
+PL_DATA_DIR = os.path.join("data", "PL DATA")
+CHAMP_DATA_DIR = os.path.join("data", "CHAMP DATA")
 
 def load_pl_data(seasons):
     """
@@ -14,10 +15,10 @@ def load_pl_data(seasons):
     for season in seasons:
         # Construct the file name, e.g., '2026-2027.csv'
         filename = f"{season}.csv"
-        filepath = os.path.join(DATA_DIR, filename)
+        filepath = os.path.join(PL_DATA_DIR, filename)
         
         if os.path.exists(filepath):
-            print(f"Loading {filename}...")
+            print(f"Loading PL season {filename}...")
             # We use latin1 encoding because these older files sometimes have weird characters
             df = pd.read_csv(filepath, encoding='latin1')
             
@@ -30,6 +31,7 @@ def load_pl_data(seasons):
             
             # Add a column so we know which season this row came from
             df['Season'] = season
+            df['League'] = 'Premier League'
             
             all_data.append(df)
         else:
@@ -44,14 +46,48 @@ def load_pl_data(seasons):
     else:
         return pd.DataFrame()
 
+def load_promoted_teams_data(season="2025-2026", promoted_teams=["Coventry", "Ipswich", "Hull"]):
+    """
+    Loads the Championship data for the promoted teams.
+    This gives them some historical data so our math model doesn't think they are ghost teams.
+    """
+    filepath = os.path.join(CHAMP_DATA_DIR, f"{season}.csv")
+    
+    if not os.path.exists(filepath):
+        print(f"Warning: Championship data not found at {filepath}")
+        return pd.DataFrame()
+        
+    print(f"Loading Championship season {season}.csv...")
+    df = pd.read_csv(filepath, encoding='latin1')
+    
+    columns_we_need = ['Date', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG']
+    df = df[columns_we_need]
+    
+    # Keep only matches where a promoted team was playing
+    mask = df['HomeTeam'].isin(promoted_teams) | df['AwayTeam'].isin(promoted_teams)
+    promoted_df = df[mask].copy()
+    
+    promoted_df['Season'] = season
+    promoted_df['League'] = 'Championship'
+    
+    return promoted_df
+
 if __name__ == "__main__":
-    # Let's test with just the last complete season and the current one
-    test_seasons = ["2025-2026", "2026-2027"]
+    # Let's test loading both PL and Championship data
+    pl_seasons = ["2025-2026", "2026-2027"]
     print("Testing data loading...\n")
     
-    df = load_pl_data(test_seasons)
+    pl_df = load_pl_data(pl_seasons)
+    champ_df = load_promoted_teams_data()
+    
+    # Combine them
+    final_df = pd.concat([pl_df, champ_df], ignore_index=True)
     
     print("\n--- Data Summary ---")
-    print(f"Total matches loaded: {len(df)}")
-    print("\nFirst 3 rows of our dataset:")
-    print(df.head(3))
+    print(f"Total PL matches loaded: {len(pl_df)}")
+    print(f"Total Championship matches loaded for promoted teams: {len(champ_df)}")
+    print(f"Total Combined matches: {len(final_df)}")
+    
+    print("\nLet's verify we have Ipswich data:")
+    ipswich_matches = final_df[(final_df['HomeTeam'] == 'Ipswich') | (final_df['AwayTeam'] == 'Ipswich')]
+    print(f"Matches involving Ipswich: {len(ipswich_matches)}")

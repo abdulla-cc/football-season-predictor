@@ -94,6 +94,59 @@ def predict_match_xg(model, home_team, away_team):
     away_xg = float(model.predict(away_input).values[0])
     
     return home_xg, away_xg
+def generate_h2h_insights(matches_df, team_a, team_b):
+    import pandas as pd
+    import numpy as np
+    
+    # Filter all matches between the two teams (home or away)
+    h2h = matches_df[
+        ((matches_df['HomeTeam'] == team_a) & (matches_df['AwayTeam'] == team_b)) |
+        ((matches_df['HomeTeam'] == team_b) & (matches_df['AwayTeam'] == team_a))
+    ].copy()
+    
+    if len(h2h) == 0:
+        return [f"No recent Premier League meetings found between {team_a} and {team_b}."]
+    
+    # Sort by date descending
+    h2h = h2h.sort_values('Date', ascending=False)
+    
+    insights = []
+    
+    # Insight 1: Recent form (Last N meetings)
+    n_matches = min(len(h2h), 5)
+    recent = h2h.head(n_matches)
+    
+    team_a_wins = sum((recent['HomeTeam'] == team_a) & (recent['FTHG'] > recent['FTAG'])) + \
+                  sum((recent['AwayTeam'] == team_a) & (recent['FTAG'] > recent['FTHG']))
+    team_b_wins = sum((recent['HomeTeam'] == team_b) & (recent['FTHG'] > recent['FTAG'])) + \
+                  sum((recent['AwayTeam'] == team_b) & (recent['FTAG'] > recent['FTHG']))
+    draws = sum(recent['FTHG'] == recent['FTAG'])
+    
+    insights.append(f"In their last {n_matches} meetings, {team_a} won {team_a_wins}, {team_b} won {team_b_wins}, with {draws} draws.")
+    
+    # Insight 2: Total Goals
+    total_goals = recent['FTHG'].sum() + recent['FTAG'].sum()
+    avg_goals = total_goals / n_matches
+    if avg_goals >= 3.0:
+        insights.append(f"High scoring! These matchups average {avg_goals:.1f} goals per game recently ({total_goals} goals in {n_matches} matches).")
+    elif avg_goals <= 1.5:
+        insights.append(f"Tight games: These matchups average just {avg_goals:.1f} goals per game recently.")
+        
+    # Insight 3: Away team's last win at Home team's stadium
+    team_b_away = h2h[(h2h['HomeTeam'] == team_a) & (h2h['AwayTeam'] == team_b)]
+    if len(team_b_away) > 0:
+        b_away_wins = team_b_away[team_b_away['FTAG'] > team_b_away['FTHG']]
+        if len(b_away_wins) == 0:
+            insights.append(f"{team_b} have not won away at {team_a} in any of the recorded recent seasons.")
+        else:
+            last_win_date = b_away_wins.iloc[0]['Date']
+            try:
+                year = last_win_date.year
+            except:
+                year = str(last_win_date)[:4] # Fallback
+            insights.append(f"{team_b}'s last away win at {team_a} was in {year}.")
+            
+    return insights
 
 def predict_match(model, home_team, away_team):
     """

@@ -434,6 +434,32 @@ export default function App() {
                   ))}
                 </div>
               </div>
+
+              {/* H2H Insights */}
+              {prediction.h2h_insights && prediction.h2h_insights.length > 0 && (
+                <div style={{ marginTop: '36px', paddingTop: '24px', borderTop: '1px solid #23293b', textAlign: 'left' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', color: '#ffd166' }}>
+                    <Activity size={18} />
+                    <span style={{ fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Head-to-Head Facts (Since 2024)
+                    </span>
+                  </div>
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {prediction.h2h_insights.map((fact, idx) => (
+                      <li key={idx} style={{ 
+                        fontSize: '14px', 
+                        color: '#f0f3f8', 
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        padding: '12px 16px',
+                        borderRadius: '8px',
+                        borderLeft: '3px solid #00f0ff'
+                      }}>
+                        {fact}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -81,6 +81,17 @@ def predict(req: MatchRequest):
     model = get_or_train_model()
     try:
         result = predict_match(model, req.home_team, req.away_team)
+        
+        # Add head-to-head random insights
+        train_data = CACHE.get("train_data")
+        if train_data is None:
+            train_data = get_complete_training_data()
+            CACHE["train_data"] = train_data
+            
+        from src.model import generate_h2h_insights
+        insights = generate_h2h_insights(train_data, req.home_team, req.away_team)
+        result["h2h_insights"] = insights
+        
         return result
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

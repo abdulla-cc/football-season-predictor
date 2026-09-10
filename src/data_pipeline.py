@@ -5,6 +5,29 @@ import pandas as pd
 PL_DATA_DIR = os.path.join("data", "PL DATA")
 CHAMP_DATA_DIR = os.path.join("data", "CHAMP DATA")
 
+# Dictionary to standardize team names across different data sources
+TEAM_NAME_MAPPINGS = {
+    "Man Utd": "Man United",
+    "Manchester United": "Man United",
+    "Man City": "Man City",
+    "Manchester City": "Man City",
+    "Spurs": "Tottenham",
+    "Nott'm Forest": "Nottingham Forest",
+    "Nottingham": "Nottingham Forest",
+    "Newcastle Utd": "Newcastle",
+    "Sheffield Utd": "Sheffield United",
+    "Luton Town": "Luton"
+}
+
+def standardize_teams(df):
+    """
+    Standardizes team names in the DataFrame to prevent the model from 
+    treating 'Man Utd' and 'Man United' as different teams.
+    """
+    df['HomeTeam'] = df['HomeTeam'].replace(TEAM_NAME_MAPPINGS)
+    df['AwayTeam'] = df['AwayTeam'].replace(TEAM_NAME_MAPPINGS)
+    return df
+
 def load_pl_data(seasons):
     """
     Loads Premier League CSV files for the given list of seasons,
@@ -42,7 +65,7 @@ def load_pl_data(seasons):
         combined_df = pd.concat(all_data, ignore_index=True)
         # Remove matches that haven't been played yet (where goals are missing/NaN)
         combined_df = combined_df.dropna(subset=['FTHG', 'FTAG'])
-        return combined_df
+        return standardize_teams(combined_df)
     else:
         return pd.DataFrame()
 
@@ -70,7 +93,7 @@ def load_promoted_teams_data(season="2025-2026", promoted_teams=["Coventry", "Ip
     promoted_df['Season'] = season
     promoted_df['League'] = 'Championship'
     
-    return promoted_df
+    return standardize_teams(promoted_df)
 
 if __name__ == "__main__":
     # Let's test loading both PL and Championship data

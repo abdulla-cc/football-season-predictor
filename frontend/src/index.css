@@ -241,6 +241,40 @@ body {
   transition: transform 0.15s, box-shadow 0.15s;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.secondary-btn {
+  background: transparent;
+  color: var(--cyan);
+  font-weight: 700;
+  font-size: 13px;
+  border: 1px solid var(--cyan);
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.secondary-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.data-update-message {
+  flex-basis: 100%;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: right;
+}
+
 .sim-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 15px var(--primary-glow);
@@ -488,4 +522,64 @@ body {
     grid-template-columns: 1fr;
     text-align: center;
   }
+}
+
+/* Model evaluation */
+.evaluation-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.evaluation-description,
+.evaluation-note,
+.metric-help {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.evaluation-description {
+  margin-top: 6px;
+}
+
+.evaluation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+  padding: 24px;
+}
+
+.metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  background: #0f131c;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.metric-label {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.metric-value {
+  color: var(--cyan);
+  font-size: 32px;
+}
+
+.metric-value.positive { color: var(--primary); }
+.metric-value.negative { color: var(--danger); }
+
+.evaluation-note {
+  margin: 0 24px 24px;
+  padding: 14px 16px;
+  background: rgba(0, 240, 255, 0.05);
+  border-left: 3px solid var(--cyan);
+  border-radius: 6px;
 }

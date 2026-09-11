@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { Trophy, Shield, Swords, RefreshCw, Activity, Flame, Award, AlertTriangle } from 'lucide-react'
+import { Trophy, Shield, Swords, RefreshCw, Activity, Flame, Award, AlertTriangle, BarChart3 } from 'lucide-react'
 
-const API_BASE = "http://127.0.0.1:8000"
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"
 
 // Premier League club colors / badges preview helper
 const CLUB_COLORS = {
@@ -33,7 +33,11 @@ export default function App() {
   const [currentTable, setCurrentTable] = useState([])
   const [strengths, setStrengths] = useState([])
   const [teams, setTeams] = useState([])
+  const [evaluation, setEvaluation] = useState(null)
+  const [seasonStatus, setSeasonStatus] = useState(null)
   const [loadingSim, setLoadingSim] = useState(false)
+  const [updatingData, setUpdatingData] = useState(false)
+  const [dataUpdateMessage, setDataUpdateMessage] = useState('')
   const [initialLoading, setInitialLoading] = useState(true)
 
   // Match Predictor state
@@ -48,6 +52,8 @@ export default function App() {
     fetchCurrentTable()
     fetchStrengths()
     fetchTeams()
+    fetchEvaluation()
+    fetchSeasonStatus()
   }, [])
 
   const fetchTeams = async () => {
@@ -99,6 +105,54 @@ export default function App() {
     }
   }
 
+  const fetchEvaluation = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/evaluation`)
+      const data = await res.json()
+      setEvaluation(data)
+    } catch (e) {
+      console.error("Failed to load model evaluation:", e)
+    }
+  }
+
+  const fetchSeasonStatus = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/season-status`)
+      const data = await res.json()
+      setSeasonStatus(data)
+    } catch (e) {
+      console.error("Failed to load season status:", e)
+    }
+  }
+
+  const updateMatchData = async () => {
+    setUpdatingData(true)
+    setDataUpdateMessage('')
+    try {
+      const res = await fetch(`${API_BASE}/api/update-data`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail || 'Data update failed')
+
+      setDataUpdateMessage(
+        data.status === 'updated'
+          ? `Updated to ${data.completed_matches} completed matches.`
+          : `Already current: ${data.completed_matches} completed matches.`
+      )
+      await Promise.all([
+        fetchSimulation(),
+        fetchCurrentTable(),
+        fetchStrengths(),
+        fetchTeams(),
+        fetchEvaluation(),
+        fetchSeasonStatus(),
+      ])
+    } catch (e) {
+      setDataUpdateMessage(e.message)
+    } finally {
+      setUpdatingData(false)
+    }
+  }
+
   // Predict match
   useEffect(() => {
     if (homeTeam && awayTeam && homeTeam !== awayTeam) {
@@ -138,19 +192,30 @@ export default function App() {
             <div className="brand-subtitle">
               <span>Season 2026/27</span>
               <span className="tag-badge">Monte Carlo (10k Runs)</span>
-              <span className="tag-badge">Poisson MLE Engine</span>
+              <span className="tag-badge">Dixon-Coles Engine</span>
             </div>
           </div>
         </div>
 
-        <button 
-          className="sim-btn" 
-          onClick={() => fetchSimulation(true)}
-          disabled={loadingSim}
-        >
-          <RefreshCw size={16} className={loadingSim ? 'spin' : ''} />
-          {loadingSim ? 'Simulating 10,000 Seasons...' : 'Re-Run Simulation'}
-        </button>
+        <div className="header-actions">
+          <button
+            className="secondary-btn"
+            onClick={updateMatchData}
+            disabled={updatingData || loadingSim}
+          >
+            <RefreshCw size={16} className={updatingData ? 'spin' : ''} />
+            {updatingData ? 'Updating Results...' : 'Update Match Data'}
+          </button>
+          <button
+            className="sim-btn"
+            onClick={() => fetchSimulation(true)}
+            disabled={loadingSim || updatingData}
+          >
+            <RefreshCw size={16} className={loadingSim ? 'spin' : ''} />
+            {loadingSim ? 'Simulating 10,000 Seasons...' : 'Re-Run Simulation'}
+          </button>
+          {dataUpdateMessage && <div className="data-update-message">{dataUpdateMessage}</div>}
+        </div>
       </header>
 
       {/* Overview Stat Strip */}
@@ -189,7 +254,11 @@ export default function App() {
               <Activity size={16} color="#ffd166" />
             </div>
             <div className="stat-value">10,000 Runs</div>
-            <div className="stat-sub">350 remaining fixtures played</div>
+            <div className="stat-sub">
+              {seasonStatus
+                ? `${seasonStatus.remaining_fixtures} remaining fixtures · ${seasonStatus.season_complete_pct}% complete`
+                : 'Calculating season progress...'}
+            </div>
           </div>
         </div>
       )}
@@ -222,6 +291,13 @@ export default function App() {
           onClick={() => setActiveTab('standings')}
         >
           <Activity size={16} /> Actual Standings (Played)
+        </button>
+
+        <button
+          className={`tab-btn ${activeTab === 'evaluation' ? 'active' : ''}`}
+          onClick={() => setActiveTab('evaluation')}
+        >
+          <BarChart3 size={16} /> Model Accuracy
         </button>
       </div>
 
@@ -381,7 +457,7 @@ export default function App() {
           {prediction && (
             <div className="prediction-result">
               <div style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '1px', color: '#8e99b0' }}>
-                Poisson Expected Goals (xG)
+                Dixon-Coles Expected Goals (xG)
               </div>
 
               <div className="xg-score">
@@ -471,7 +547,7 @@ export default function App() {
           <div className="table-header">
             <div className="table-title">Fitted Team Attack & Defense Strengths</div>
             <div style={{ fontSize: '12px', color: '#8e99b0' }}>
-              Estimates derived via Poisson Maximum Likelihood Estimation (MLE).
+              Estimates derived via Poisson MLE with a fitted Dixon-Coles low-score correction.
             </div>
           </div>
 
@@ -510,9 +586,14 @@ export default function App() {
       {activeTab === 'standings' && (
         <div className="table-container">
           <div className="table-header">
-            <div className="table-title">Actual Premier League 2026/27 Results (Gameweek 3)</div>
+            <div className="table-title">
+              Actual Premier League 2026/27 Results
+              {seasonStatus ? ` (${seasonStatus.completed_matches} Matches Played)` : ''}
+            </div>
             <div style={{ fontSize: '12px', color: '#8e99b0' }}>
-              Official results so far from football-data.co.uk before simulation.
+              {seasonStatus?.latest_result_date
+                ? `Results through ${new Date(`${seasonStatus.latest_result_date}T00:00:00`).toLocaleDateString()}.`
+                : 'Official results so far from football-data.co.uk before simulation.'}
             </div>
           </div>
 
@@ -548,6 +629,59 @@ export default function App() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {activeTab === 'evaluation' && evaluation && (
+        <div className="evaluation-panel">
+          <div className="table-header">
+            <div>
+              <div className="table-title">Historical Backtest</div>
+              <div className="evaluation-description">
+                The model trained on {evaluation.training_matches} earlier matches and was tested on {evaluation.test_matches} later matches it had never seen.
+              </div>
+            </div>
+            <span className="tag-badge">{evaluation.method}</span>
+          </div>
+
+          <div className="evaluation-grid">
+            <div className="metric-card">
+              <span className="metric-label">Correct result</span>
+              <strong className="metric-value">{evaluation.outcome_accuracy_pct}%</strong>
+              <span className="metric-help">Correctly chose home win, draw, or away win.</span>
+            </div>
+            <div className="metric-card">
+              <span className="metric-label">Exact score</span>
+              <strong className="metric-value">{evaluation.exact_score_accuracy_pct}%</strong>
+              <span className="metric-help">The most likely score exactly matched the result.</span>
+            </div>
+            <div className="metric-card">
+              <span className="metric-label">Goal error</span>
+              <strong className="metric-value">{evaluation.goal_mae}</strong>
+              <span className="metric-help">Average goals missed per team; lower is better.</span>
+            </div>
+            <div className="metric-card">
+              <span className="metric-label">Probability score</span>
+              <strong className="metric-value">{evaluation.log_loss}</strong>
+              <span className="metric-help">Log loss; lower means better probabilities.</span>
+            </div>
+            <div className="metric-card">
+              <span className="metric-label">Simple baseline</span>
+              <strong className="metric-value">{evaluation.baseline_log_loss}</strong>
+              <span className="metric-help">Log loss from using only historical result frequencies.</span>
+            </div>
+            <div className="metric-card">
+              <span className="metric-label">Improvement</span>
+              <strong className={`metric-value ${evaluation.log_loss_improvement_pct >= 0 ? 'positive' : 'negative'}`}>
+                {evaluation.log_loss_improvement_pct > 0 ? '+' : ''}{evaluation.log_loss_improvement_pct}%
+              </strong>
+              <span className="metric-help">Model improvement over the simple baseline.</span>
+            </div>
+          </div>
+
+          <div className="evaluation-note">
+            Training ended {evaluation.training_end_date}; testing began {evaluation.test_start_date}. This time-based split prevents future results from leaking into training.
+          </div>
         </div>
       )}
     </div>

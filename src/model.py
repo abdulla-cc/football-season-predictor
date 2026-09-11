@@ -1,7 +1,20 @@
 import numpy as np
 from scipy.stats import poisson
 
-def calculate_match_probabilities(home_xg, away_xg, max_goals=10):
+def dixon_coles_tau(home_goals, away_goals, home_xg, away_xg, rho):
+    """Dixon-Coles correction for the four unusually correlated low scores."""
+    if home_goals == 0 and away_goals == 0:
+        return 1 - (home_xg * away_xg * rho)
+    if home_goals == 0 and away_goals == 1:
+        return 1 + (home_xg * rho)
+    if home_goals == 1 and away_goals == 0:
+        return 1 + (away_xg * rho)
+    if home_goals == 1 and away_goals == 1:
+        return 1 - rho
+    return 1.0
+
+
+def calculate_match_probabilities(home_xg, away_xg, max_goals=10, rho=0.0):
     """
     Given expected goals (xG / lambda) for Home and Away teams,
     calculates the probability matrix of all possible scorelines (0-0 up to max_goals x max_goals),
@@ -23,9 +36,19 @@ def calculate_match_probabilities(home_xg, away_xg, max_goals=10):
     home_probs = poisson.pmf(goals, home_xg)
     away_probs = poisson.pmf(goals, away_xg)
     
-    # Outer product gives the probability matrix for any scoreline (i, j)
+    # Outer product gives the independent Poisson probability matrix.
     # P(Home=i and Away=j) = P(Home=i) * P(Away=j)
     score_matrix = np.outer(home_probs, away_probs)
+
+    # Football's lowest scores are not fully independent. Dixon-Coles corrects
+    # 0-0, 0-1, 1-0 and 1-1 using a correlation learned from historical games.
+    for home_goals, away_goals in ((0, 0), (0, 1), (1, 0), (1, 1)):
+        score_matrix[home_goals, away_goals] *= dixon_coles_tau(
+            home_goals, away_goals, home_xg, away_xg, rho
+        )
+
+    score_matrix = np.clip(score_matrix, 0, None)
+    score_matrix /= score_matrix.sum()
     
     # Sum probabilities where home > away, home == away, home < away
     prob_home_win = np.sum(np.tril(score_matrix, -1))
@@ -80,7 +103,35 @@ def fit_poisson_model(matches_df):
         family=sm.families.Poisson()
     ).fit()
     
+    model.dixon_coles_rho = fit_dixon_coles_rho(model, matches_df)
     return model
+
+
+def fit_dixon_coles_rho(model, matches_df):
+    """Estimate the low-score correlation after fitting team attack and defence."""
+    from scipy.optimize import minimize_scalar
+
+    expected_goals = []
+    for row in matches_df.itertuples(index=False):
+        home_xg, away_xg = predict_match_xg(model, row.HomeTeam, row.AwayTeam)
+        expected_goals.append((row.FTHG, row.FTAG, home_xg, away_xg))
+
+    def negative_log_likelihood(rho):
+        total = 0.0
+        for home_goals, away_goals, home_xg, away_xg in expected_goals:
+            correction = dixon_coles_tau(home_goals, away_goals, home_xg, away_xg, rho)
+            if correction <= 0:
+                return np.inf
+            total -= np.log(correction)
+        return total
+
+    result = minimize_scalar(
+        negative_log_likelihood,
+        bounds=(-0.2, 0.2),
+        method="bounded",
+        options={"xatol": 1e-8},
+    )
+    return float(result.x) if result.success else 0.0
 
 def predict_match_xg(model, home_team, away_team):
     """
@@ -153,7 +204,8 @@ def predict_match(model, home_team, away_team):
     End-to-end prediction: returns expected goals, outcome probabilities, and top scorelines.
     """
     home_xg, away_xg = predict_match_xg(model, home_team, away_team)
-    probs, matrix = calculate_match_probabilities(home_xg, away_xg)
+    rho = float(getattr(model, "dixon_coles_rho", 0.0))
+    probs, matrix = calculate_match_probabilities(home_xg, away_xg, rho=rho)
     
     # Top 3 most likely scorelines
     unraveled_indices = np.argsort(matrix, axis=None)[::-1][:3]
@@ -167,6 +219,7 @@ def predict_match(model, home_team, away_team):
         'away_team': away_team,
         'home_xg': round(home_xg, 2),
         'away_xg': round(away_xg, 2),
+        'dixon_coles_rho': round(rho, 4),
         'home_win_prob': round(probs['home_win'] * 100, 1),
         'draw_prob': round(probs['draw'] * 100, 1),
         'away_win_prob': round(probs['away_win'] * 100, 1),
@@ -231,5 +284,4 @@ if __name__ == "__main__":
         print(f"  Expected Goals: {pred['home_team']} {pred['home_xg']} - {pred['away_xg']} {pred['away_team']}")
         print(f"  Win Odds: Home {pred['home_win_prob']}% | Draw {pred['draw_prob']}% | Away {pred['away_win_prob']}%")
         print(f"  Top Scoreline: {pred['top_scorelines'][0][0]} ({pred['top_scorelines'][0][1]:.1%})")
-
 

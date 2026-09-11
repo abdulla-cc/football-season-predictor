@@ -6,7 +6,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import itertools
 import numpy as np
 import pandas as pd
-from src.model import predict_match_xg
+from src.model import calculate_match_probabilities, predict_match_xg
 
 def calculate_current_table(played_df, teams):
     """
@@ -57,6 +57,30 @@ def get_remaining_fixtures(played_df, teams):
     remaining = sorted(list(all_possible - played))
     return remaining
 
+
+def calculate_season_status(played_df):
+    """Summarize season progress without assuming a fixed gameweek."""
+    teams = sorted(set(played_df["HomeTeam"]) | set(played_df["AwayTeam"]))
+    team_count = len(teams)
+    total_fixtures = team_count * (team_count - 1)
+    completed_matches = len(played_df)
+
+    matches_played_by_team = {team: 0 for team in teams}
+    for row in played_df.itertuples(index=False):
+        matches_played_by_team[row.HomeTeam] += 1
+        matches_played_by_team[row.AwayTeam] += 1
+
+    return {
+        "team_count": team_count,
+        "completed_matches": completed_matches,
+        "remaining_fixtures": max(total_fixtures - completed_matches, 0),
+        "total_fixtures": total_fixtures,
+        "season_complete_pct": round(completed_matches / total_fixtures * 100, 1) if total_fixtures else 0.0,
+        "minimum_team_matches": min(matches_played_by_team.values()) if teams else 0,
+        "maximum_team_matches": max(matches_played_by_team.values()) if teams else 0,
+        "latest_result_date": played_df["Date"].max().date().isoformat() if completed_matches else None,
+    }
+
 def run_monte_carlo_simulation(model, played_df, n_simulations=10000, random_seed=42):
     """
     Runs full-season Monte Carlo simulations for remaining fixtures.
@@ -102,10 +126,24 @@ def run_monte_carlo_simulation(model, played_df, n_simulations=10000, random_see
     home_xg_arr = np.array(home_xg_list)
     away_xg_arr = np.array(away_xg_list)
     
-    # 3. Vectorized simulation: sample goals for all remaining matches across n_simulations
+    # 3. Sample each fixture from its Dixon-Coles corrected score distribution.
     # Shape: (n_remaining, n_simulations)
-    sim_home_goals = np.random.poisson(home_xg_arr[:, None], size=(n_remaining, n_simulations))
-    sim_away_goals = np.random.poisson(away_xg_arr[:, None], size=(n_remaining, n_simulations))
+    max_goals = 10
+    rho = float(getattr(model, "dixon_coles_rho", 0.0))
+    sim_home_goals = np.empty((n_remaining, n_simulations), dtype=int)
+    sim_away_goals = np.empty((n_remaining, n_simulations), dtype=int)
+    for fixture_idx, (home_xg, away_xg) in enumerate(zip(home_xg_arr, away_xg_arr)):
+        _, score_matrix = calculate_match_probabilities(
+            home_xg, away_xg, max_goals=max_goals, rho=rho
+        )
+        sampled_scores = np.random.choice(
+            score_matrix.size,
+            size=n_simulations,
+            p=score_matrix.ravel(),
+        )
+        sim_home_goals[fixture_idx], sim_away_goals[fixture_idx] = np.unravel_index(
+            sampled_scores, score_matrix.shape
+        )
     
     # Points earned in simulated matches
     home_win = (sim_home_goals > sim_away_goals).astype(int)

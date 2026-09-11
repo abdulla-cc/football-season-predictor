@@ -1,7 +1,26 @@
 import React, { useState, useEffect } from 'react'
-import { Trophy, Shield, Swords, RefreshCw, Activity, Flame, Award, AlertTriangle, BarChart3 } from 'lucide-react'
+import { Trophy, Shield, Swords, RefreshCw, Activity, Award, AlertTriangle, BarChart3 } from 'lucide-react'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"
+
+async function fetchJson(path, options) {
+  let response
+  try {
+    response = await fetch(`${API_BASE}${path}`, options)
+  } catch {
+    throw new Error('Cannot reach the prediction server. Wait a moment and try again.')
+  }
+  let data
+  try {
+    data = await response.json()
+  } catch {
+    throw new Error(`Server returned an unreadable response (${response.status}).`)
+  }
+  if (!response.ok) {
+    throw new Error(data.detail || `Request failed with status ${response.status}.`)
+  }
+  return data
+}
 
 // Premier League club colors / badges preview helper
 const CLUB_COLORS = {
@@ -38,38 +57,39 @@ export default function App() {
   const [loadingSim, setLoadingSim] = useState(false)
   const [updatingData, setUpdatingData] = useState(false)
   const [dataUpdateMessage, setDataUpdateMessage] = useState('')
-  const [initialLoading, setInitialLoading] = useState(true)
+  const [dataUpdateFailed, setDataUpdateFailed] = useState(false)
+  const [loadingTable, setLoadingTable] = useState(true)
+  const [loadingStrengths, setLoadingStrengths] = useState(false)
+  const [loadingEvaluation, setLoadingEvaluation] = useState(false)
+  const [requestErrors, setRequestErrors] = useState({})
 
   // Match Predictor state
   const [homeTeam, setHomeTeam] = useState('Arsenal')
   const [awayTeam, setAwayTeam] = useState('Chelsea')
   const [prediction, setPrediction] = useState(null)
   const [predicting, setPredicting] = useState(false)
+  const [predictionError, setPredictionError] = useState('')
 
-  // Fetch initial data
-  useEffect(() => {
-    fetchSimulation()
-    fetchCurrentTable()
-    fetchTeams()
-    fetchSeasonStatus()
-  }, [])
-
-  // Expensive model views load only when the user opens their tab.
-  useEffect(() => {
-    if (activeTab === 'powers' && strengths.length === 0) fetchStrengths()
-    if (activeTab === 'evaluation' && !evaluation) fetchEvaluation()
-  }, [activeTab])
+  const setRequestError = (key, error = null) => {
+    setRequestErrors(current => {
+      const next = { ...current }
+      if (error) next[key] = error.message || String(error)
+      else delete next[key]
+      return next
+    })
+  }
 
   const fetchTeams = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/teams`)
-      const data = await res.json()
+      setRequestError('teams')
+      const data = await fetchJson('/api/teams')
       if (data.teams) {
         setTeams(data.teams)
         if (!homeTeam && data.teams.length > 0) setHomeTeam(data.teams[0])
         if (!awayTeam && data.teams.length > 1) setAwayTeam(data.teams[1])
       }
     } catch (e) {
+      setRequestError('teams', e)
       console.warn("Using default teams list", e)
     }
   }
@@ -77,54 +97,66 @@ export default function App() {
   const fetchSimulation = async (refresh = false) => {
     setLoadingSim(true)
     try {
-      const url = `${API_BASE}/api/simulation${refresh ? '?refresh=true' : ''}`
-      const res = await fetch(url)
-      const data = await res.json()
+      setRequestError('simulation')
+      const data = await fetchJson(`/api/simulation${refresh ? '?refresh=true' : ''}`)
       setSimData(data)
     } catch (e) {
+      setRequestError('simulation', e)
       console.error("Failed to load simulation:", e)
     } finally {
       setLoadingSim(false)
-      setInitialLoading(false)
     }
   }
 
   const fetchCurrentTable = async () => {
+    setLoadingTable(true)
     try {
-      const res = await fetch(`${API_BASE}/api/current-table`)
-      const data = await res.json()
+      setRequestError('standings')
+      const data = await fetchJson('/api/current-table')
       setCurrentTable(data)
     } catch (e) {
+      setRequestError('standings', e)
       console.error("Failed to load current table:", e)
+    } finally {
+      setLoadingTable(false)
     }
   }
 
   const fetchStrengths = async () => {
+    setLoadingStrengths(true)
     try {
-      const res = await fetch(`${API_BASE}/api/team-strengths`)
-      const data = await res.json()
+      setRequestError('strengths')
+      const data = await fetchJson('/api/team-strengths')
       setStrengths(data)
     } catch (e) {
+      setRequestError('strengths', e)
       console.error("Failed to load strengths:", e)
+    } finally {
+      setLoadingStrengths(false)
     }
   }
 
   const fetchEvaluation = async () => {
+    setLoadingEvaluation(true)
     try {
-      const res = await fetch(`${API_BASE}/api/evaluation`)
-      const data = await res.json()
+      setRequestError('evaluation')
+      const data = await fetchJson('/api/evaluation')
       setEvaluation(data)
     } catch (e) {
+      setRequestError('evaluation', e)
       console.error("Failed to load model evaluation:", e)
+    } finally {
+      setLoadingEvaluation(false)
     }
   }
 
   const fetchSeasonStatus = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/season-status`)
-      const data = await res.json()
+      setRequestError('season status')
+      const data = await fetchJson('/api/season-status')
       setSeasonStatus(data)
     } catch (e) {
+      setRequestError('season status', e)
       console.error("Failed to load season status:", e)
     }
   }
@@ -132,10 +164,9 @@ export default function App() {
   const updateMatchData = async () => {
     setUpdatingData(true)
     setDataUpdateMessage('')
+    setDataUpdateFailed(false)
     try {
-      const res = await fetch(`${API_BASE}/api/update-data`, { method: 'POST' })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.detail || 'Data update failed')
+      const data = await fetchJson('/api/update-data', { method: 'POST' })
 
       setDataUpdateMessage(
         data.status === 'updated'
@@ -151,34 +182,61 @@ export default function App() {
         fetchSeasonStatus(),
       ])
     } catch (e) {
+      setDataUpdateFailed(true)
       setDataUpdateMessage(e.message)
     } finally {
       setUpdatingData(false)
     }
   }
 
-  // Predict match
-  useEffect(() => {
-    if (activeTab === 'predictor' && homeTeam && awayTeam && homeTeam !== awayTeam) {
-      runPrediction(homeTeam, awayTeam)
-    }
-  }, [activeTab, homeTeam, awayTeam])
-
   const runPrediction = async (h, a) => {
     setPredicting(true)
+    setPredictionError('')
     try {
-      const res = await fetch(`${API_BASE}/api/predict-match`, {
+      const data = await fetchJson('/api/predict-match', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ home_team: h, away_team: a })
       })
-      const data = await res.json()
       setPrediction(data)
     } catch (e) {
+      setPredictionError(e.message || 'Prediction failed.')
       console.error("Prediction failed:", e)
     } finally {
       setPredicting(false)
     }
+  }
+
+  // These effects intentionally react to view state; request functions are kept
+  // outside their dependency lists so a state update cannot retrigger a fetch loop.
+  useEffect(() => {
+    fetchSimulation()
+    fetchCurrentTable()
+    fetchTeams()
+    fetchSeasonStatus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    if (activeTab === 'powers' && strengths.length === 0) fetchStrengths()
+    if (activeTab === 'evaluation' && !evaluation) fetchEvaluation()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, strengths.length, evaluation])
+
+  useEffect(() => {
+    if (activeTab === 'predictor' && homeTeam && awayTeam && homeTeam !== awayTeam) {
+      runPrediction(homeTeam, awayTeam)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, homeTeam, awayTeam])
+
+  const retryVisibleData = () => {
+    fetchSimulation()
+    fetchCurrentTable()
+    fetchTeams()
+    fetchSeasonStatus()
+    if (activeTab === 'powers') fetchStrengths()
+    if (activeTab === 'evaluation') fetchEvaluation()
   }
 
   // Top Title favorite and high risk teams
@@ -218,9 +276,24 @@ export default function App() {
             <RefreshCw size={16} className={loadingSim ? 'spin' : ''} />
             {loadingSim ? 'Simulating 10,000 Seasons...' : 'Re-Run Simulation'}
           </button>
-          {dataUpdateMessage && <div className="data-update-message">{dataUpdateMessage}</div>}
+          {dataUpdateMessage && (
+            <div className={`data-update-message ${dataUpdateFailed ? 'failed' : ''}`} role={dataUpdateFailed ? 'alert' : undefined}>
+              {dataUpdateMessage}
+            </div>
+          )}
         </div>
       </header>
+
+      {Object.keys(requestErrors).length > 0 && (
+        <div className="error-banner" role="alert">
+          <AlertTriangle size={20} />
+          <div>
+            <strong>Some dashboard data could not be loaded.</strong>
+            <span>{Object.entries(requestErrors).map(([key, message]) => `${key}: ${message}`).join(' · ')}</span>
+          </div>
+          <button className="retry-btn" onClick={retryVisibleData}>Try Again</button>
+        </div>
+      )}
 
       {/* Overview Stat Strip */}
       {simData.length > 0 && (
@@ -332,7 +405,11 @@ export default function App() {
               </tr>
             </thead>
             <tbody>
-              {simData.map((row, idx) => {
+              {loadingSim && simData.length === 0 ? (
+                <tr><td colSpan="9"><div className="table-state"><RefreshCw className="spin" size={22} />Running the first season simulation…</div></td></tr>
+              ) : requestErrors.simulation && simData.length === 0 ? (
+                <tr><td colSpan="9"><div className="table-state error-text">Season forecast is unavailable. Use “Try Again” above.</div></td></tr>
+              ) : simData.map((row, idx) => {
                 const pos = idx + 1
                 let zoneClass = 'row-mid'
                 let rankClass = 'rank-mid'
@@ -458,7 +535,19 @@ export default function App() {
             </div>
           </div>
 
-          {prediction && (
+          {predicting && (
+            <div className="section-state"><RefreshCw className="spin" size={22} />Calculating match probabilities…</div>
+          )}
+
+          {predictionError && !predicting && (
+            <div className="section-state error-text" role="alert">
+              <AlertTriangle size={22} />
+              <span>{predictionError}</span>
+              <button className="retry-btn" onClick={() => runPrediction(homeTeam, awayTeam)}>Try Again</button>
+            </div>
+          )}
+
+          {prediction && !predicting && !predictionError && (
             <div className="prediction-result">
               <div style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '1px', color: '#8e99b0' }}>
                 Dixon-Coles Expected Goals (xG)
@@ -565,7 +654,11 @@ export default function App() {
               </tr>
             </thead>
             <tbody>
-              {strengths.map(s => (
+              {loadingStrengths && strengths.length === 0 ? (
+                <tr><td colSpan="4"><div className="table-state"><RefreshCw className="spin" size={22} />Loading team ratings…</div></td></tr>
+              ) : requestErrors.strengths && strengths.length === 0 ? (
+                <tr><td colSpan="4"><div className="table-state error-text">Team ratings are unavailable. Use “Try Again” above.</div></td></tr>
+              ) : strengths.map(s => (
                 <tr key={s.Team}>
                   <td style={{ fontWeight: '700' }}>{s.Team}</td>
                   <td style={{ color: s.Attack_Strength > 0 ? '#00ff87' : '#e63946', fontWeight: '700' }}>
@@ -617,7 +710,11 @@ export default function App() {
               </tr>
             </thead>
             <tbody>
-              {currentTable.map((r, i) => (
+              {loadingTable && currentTable.length === 0 ? (
+                <tr><td colSpan="10"><div className="table-state"><RefreshCw className="spin" size={22} />Loading current standings…</div></td></tr>
+              ) : requestErrors.standings && currentTable.length === 0 ? (
+                <tr><td colSpan="10"><div className="table-state error-text">Current standings are unavailable. Use “Try Again” above.</div></td></tr>
+              ) : currentTable.map((r, i) => (
                 <tr key={r.Team}>
                   <td><span className="rank-badge">{i + 1}</span></td>
                   <td style={{ fontWeight: '700' }}>{r.Team}</td>
@@ -634,6 +731,14 @@ export default function App() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {activeTab === 'evaluation' && loadingEvaluation && !evaluation && (
+        <div className="section-state"><RefreshCw className="spin" size={22} />Running historical backtest…</div>
+      )}
+
+      {activeTab === 'evaluation' && requestErrors.evaluation && !loadingEvaluation && !evaluation && (
+        <div className="section-state error-text">Model evaluation is unavailable. Use “Try Again” above.</div>
       )}
 
       {activeTab === 'evaluation' && evaluation && (

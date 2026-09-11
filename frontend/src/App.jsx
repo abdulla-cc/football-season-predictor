@@ -312,7 +312,7 @@ export default function App() {
             <div>
               <div className="table-title">Simulated Final Standings & Probability Distribution</div>
               <div style={{ fontSize: '12px', color: '#8e99b0', marginTop: '4px' }}>
-                Based on 10,000 independent season simulations combining actual 2026/27 results + Poisson match sampling.
+                Based on 10,000 independent season simulations combining actual 2026/27 results + Dixon-Coles score sampling.
               </div>
             </div>
           </div>

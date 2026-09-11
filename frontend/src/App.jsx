@@ -50,11 +50,15 @@ export default function App() {
   useEffect(() => {
     fetchSimulation()
     fetchCurrentTable()
-    fetchStrengths()
     fetchTeams()
-    fetchEvaluation()
     fetchSeasonStatus()
   }, [])
+
+  // Expensive model views load only when the user opens their tab.
+  useEffect(() => {
+    if (activeTab === 'powers' && strengths.length === 0) fetchStrengths()
+    if (activeTab === 'evaluation' && !evaluation) fetchEvaluation()
+  }, [activeTab])
 
   const fetchTeams = async () => {
     try {
@@ -138,12 +142,12 @@ export default function App() {
           ? `Updated to ${data.completed_matches} completed matches.`
           : `Already current: ${data.completed_matches} completed matches.`
       )
+      setStrengths([])
+      setEvaluation(null)
       await Promise.all([
         fetchSimulation(),
         fetchCurrentTable(),
-        fetchStrengths(),
         fetchTeams(),
-        fetchEvaluation(),
         fetchSeasonStatus(),
       ])
     } catch (e) {
@@ -155,10 +159,10 @@ export default function App() {
 
   // Predict match
   useEffect(() => {
-    if (homeTeam && awayTeam && homeTeam !== awayTeam) {
+    if (activeTab === 'predictor' && homeTeam && awayTeam && homeTeam !== awayTeam) {
       runPrediction(homeTeam, awayTeam)
     }
-  }, [homeTeam, awayTeam])
+  }, [activeTab, homeTeam, awayTeam])
 
   const runPrediction = async (h, a) => {
     setPredicting(true)

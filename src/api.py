@@ -1,6 +1,7 @@
 import sys
 import os
 import asyncio
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -18,6 +19,7 @@ from src.data_updater import update_current_season_data
 
 # Global cache for trained model and simulation results to ensure instant responses
 CACHE = {}
+COMPUTE_LOCK = threading.RLock()
 
 
 async def periodic_data_update():
@@ -27,7 +29,8 @@ async def periodic_data_update():
         try:
             result = await asyncio.to_thread(update_current_season_data)
             if result["completed_matches"] > result["previous_matches"]:
-                CACHE.clear()
+                with COMPUTE_LOCK:
+                    CACHE.clear()
                 print(f"Match data updated: {result['completed_matches']} completed matches")
         except Exception as exc:
             # A temporary network/source failure must not stop the API.
@@ -63,20 +66,22 @@ app.add_middleware(
 )
 
 def get_or_train_model():
-    if "model" not in CACHE:
-        print("Training model...")
-        train_data = get_complete_training_data()
-        CACHE["model"] = fit_poisson_model(train_data)
-    return CACHE["model"]
+    with COMPUTE_LOCK:
+        if "model" not in CACHE:
+            print("Training model...")
+            train_data = get_complete_training_data()
+            CACHE["model"] = fit_poisson_model(train_data)
+        return CACHE["model"]
 
 def get_cached_simulation():
-    if "simulation" not in CACHE:
-        print("Running Monte Carlo simulation cache...")
-        model = get_or_train_model()
-        played = load_pl_data(['2026-2027'])
-        sim_df = run_monte_carlo_simulation(model, played, n_simulations=10000)
-        CACHE["simulation"] = sim_df
-    return CACHE["simulation"]
+    with COMPUTE_LOCK:
+        if "simulation" not in CACHE:
+            print("Running Monte Carlo simulation cache...")
+            model = get_or_train_model()
+            played = load_pl_data(['2026-2027'])
+            sim_df = run_monte_carlo_simulation(model, played, n_simulations=10000)
+            CACHE["simulation"] = sim_df
+        return CACHE["simulation"]
 
 class MatchRequest(BaseModel):
     home_team: str
@@ -123,16 +128,18 @@ def team_strengths():
 
 @app.get("/api/evaluation")
 def model_evaluation():
-    if "evaluation" not in CACHE:
-        historical_matches = load_pl_data(["2025-2026"])
-        CACHE["evaluation"] = evaluate_chronological_holdout(historical_matches)
-    return CACHE["evaluation"]
+    with COMPUTE_LOCK:
+        if "evaluation" not in CACHE:
+            historical_matches = load_pl_data(["2025-2026"])
+            CACHE["evaluation"] = evaluate_chronological_holdout(historical_matches)
+        return CACHE["evaluation"]
 
 @app.post("/api/update-data")
 def update_data():
     try:
         result = update_current_season_data()
-        CACHE.clear()
+        with COMPUTE_LOCK:
+            CACHE.clear()
         return result
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Data update failed: {exc}")

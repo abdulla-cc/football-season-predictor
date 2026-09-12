@@ -2,13 +2,24 @@ import React, { useState, useEffect } from 'react'
 import { Trophy, Shield, Swords, RefreshCw, Activity, Award, AlertTriangle, BarChart3 } from 'lucide-react'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"
+const SERVER_WAKE_TIMEOUT_MS = 75_000
+const HEALTH_RETRY_DELAY_MS = 3_000
 
-async function fetchJson(path, options) {
+const wait = (milliseconds) => new Promise(resolve => setTimeout(resolve, milliseconds))
+
+async function fetchJson(path, options, timeoutMs = 15_000) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
   let response
   try {
-    response = await fetch(`${API_BASE}${path}`, options)
-  } catch {
+    response = await fetch(`${API_BASE}${path}`, { ...options, signal: controller.signal })
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error('The prediction server is taking longer than expected to respond.')
+    }
     throw new Error('Cannot reach the prediction server. Wait a moment and try again.')
+  } finally {
+    clearTimeout(timeout)
   }
   let data
   try {
@@ -54,11 +65,12 @@ export default function App() {
   const [teams, setTeams] = useState([])
   const [evaluation, setEvaluation] = useState(null)
   const [seasonStatus, setSeasonStatus] = useState(null)
-  const [loadingSim, setLoadingSim] = useState(false)
+  const [loadingSim, setLoadingSim] = useState(true)
   const [loadingTable, setLoadingTable] = useState(true)
   const [loadingStrengths, setLoadingStrengths] = useState(false)
   const [loadingEvaluation, setLoadingEvaluation] = useState(false)
   const [requestErrors, setRequestErrors] = useState({})
+  const [serverStatus, setServerStatus] = useState('waking')
 
   // Match Predictor state
   const [homeTeam, setHomeTeam] = useState('Arsenal')
@@ -158,6 +170,31 @@ export default function App() {
     }
   }
 
+  const wakeServerAndLoad = async () => {
+    setServerStatus('waking')
+    const deadline = Date.now() + SERVER_WAKE_TIMEOUT_MS
+
+    while (Date.now() < deadline) {
+      try {
+        await fetchJson('/api/health', undefined, 12_000)
+        setServerStatus('ready')
+        await Promise.allSettled([
+          fetchSimulation(),
+          fetchCurrentTable(),
+          fetchTeams(),
+          fetchSeasonStatus()
+        ])
+        return
+      } catch {
+        if (Date.now() < deadline) await wait(HEALTH_RETRY_DELAY_MS)
+      }
+    }
+
+    setLoadingSim(false)
+    setLoadingTable(false)
+    setServerStatus('failed')
+  }
+
   const runPrediction = async (h, a) => {
     setPredicting(true)
     setPredictionError('')
@@ -179,33 +216,26 @@ export default function App() {
   // These effects intentionally react to view state; request functions are kept
   // outside their dependency lists so a state update cannot retrigger a fetch loop.
   useEffect(() => {
-    fetchSimulation()
-    fetchCurrentTable()
-    fetchTeams()
-    fetchSeasonStatus()
+    wakeServerAndLoad()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
+    if (serverStatus !== 'ready') return
     if (activeTab === 'powers' && strengths.length === 0) fetchStrengths()
     if (activeTab === 'evaluation' && !evaluation) fetchEvaluation()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, strengths.length, evaluation])
+  }, [activeTab, strengths.length, evaluation, serverStatus])
 
   useEffect(() => {
-    if (activeTab === 'predictor' && homeTeam && awayTeam && homeTeam !== awayTeam) {
+    if (serverStatus === 'ready' && activeTab === 'predictor' && homeTeam && awayTeam && homeTeam !== awayTeam) {
       runPrediction(homeTeam, awayTeam)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, homeTeam, awayTeam])
+  }, [activeTab, homeTeam, awayTeam, serverStatus])
 
   const retryVisibleData = () => {
-    fetchSimulation()
-    fetchCurrentTable()
-    fetchTeams()
-    fetchSeasonStatus()
-    if (activeTab === 'powers') fetchStrengths()
-    if (activeTab === 'evaluation') fetchEvaluation()
+    wakeServerAndLoad()
   }
 
   // Top Title favorite and high risk teams
@@ -229,6 +259,27 @@ export default function App() {
         </div>
 
       </header>
+
+      {serverStatus === 'waking' && (
+        <div className="server-banner" role="status">
+          <RefreshCw className="spin" size={20} />
+          <div>
+            <strong>Waking the prediction server…</strong>
+            <span>Render’s free service can take up to a minute after inactivity. The dashboard will load automatically.</span>
+          </div>
+        </div>
+      )}
+
+      {serverStatus === 'failed' && (
+        <div className="error-banner" role="alert">
+          <AlertTriangle size={20} />
+          <div>
+            <strong>The prediction server did not wake in time.</strong>
+            <span>Render may still be starting. Wait a moment, then try again.</span>
+          </div>
+          <button className="retry-btn" onClick={wakeServerAndLoad}>Try Again</button>
+        </div>
+      )}
 
       {Object.keys(requestErrors).length > 0 && (
         <div className="error-banner" role="alert">

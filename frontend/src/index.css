@@ -226,7 +226,8 @@ body {
   font-weight: 700;
 }
 
-.error-banner {
+.error-banner,
+.server-banner {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -238,14 +239,22 @@ body {
   border-radius: 10px;
 }
 
-.error-banner > div {
+.server-banner {
+  color: #d9fbff;
+  background: rgba(0, 240, 255, 0.08);
+  border-color: rgba(0, 240, 255, 0.3);
+}
+
+.error-banner > div,
+.server-banner > div {
   display: flex;
   flex: 1;
   flex-direction: column;
   gap: 4px;
 }
 
-.error-banner span {
+.error-banner span,
+.server-banner span {
   color: var(--text-muted);
   font-size: 12px;
 }
@@ -288,7 +297,8 @@ body {
 }
 
 @media (max-width: 768px) {
-  .error-banner {
+  .error-banner,
+  .server-banner {
     align-items: flex-start;
     flex-direction: column;
   }

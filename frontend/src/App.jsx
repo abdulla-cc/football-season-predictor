@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import './editorial.css'
 import { Trophy, Shield, Swords, RefreshCw, Activity, Award, AlertTriangle, BarChart3 } from 'lucide-react'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"
@@ -33,28 +34,33 @@ async function fetchJson(path, options, timeoutMs = 120_000) {
   return data
 }
 
-// Premier League club colors / badges preview helper
-const CLUB_COLORS = {
-  "Arsenal": "#EF0107",
-  "Aston Villa": "#95BFE5",
-  "Bournemouth": "#DA291C",
-  "Brentford": "#E30613",
-  "Brighton": "#0057B8",
-  "Chelsea": "#034694",
-  "Coventry": "#00AEEF",
-  "Crystal Palace": "#1B458F",
-  "Everton": "#003399",
-  "Fulham": "#FFFFFF",
-  "Hull": "#F5A623",
-  "Ipswich": "#0047AB",
-  "Leeds": "#FFCD00",
-  "Liverpool": "#C8102E",
-  "Man City": "#6CABDD",
-  "Man United": "#DA291C",
-  "Newcastle": "#241F20",
-  "Nottingham Forest": "#DD0000",
-  "Sunderland": "#EB172B",
-  "Tottenham": "#132257"
+// Crest source: https://www.footylogos.com/competition/premier-league
+const CLUB_BADGES = {
+  "Arsenal": "arsenal",
+  "Aston Villa": "aston-villa",
+  "Bournemouth": "afc-bournemouth",
+  "Brentford": "brentford",
+  "Brighton": "brighton-and-hove-albion",
+  "Chelsea": "chelsea",
+  "Coventry": "coventry-city",
+  "Crystal Palace": "crystal-palace",
+  "Everton": "everton",
+  "Fulham": "fulham",
+  "Hull": "hull-city",
+  "Ipswich": "ipswich-town",
+  "Leeds": "leeds-united",
+  "Liverpool": "liverpool-fc",
+  "Man City": "manchester-city",
+  "Man United": "manchester-united",
+  "Newcastle": "newcastle-united",
+  "Nottingham Forest": "nottingham-forest",
+  "Sunderland": "sunderland",
+  "Tottenham": "tottenham-hotspur"
+}
+
+function ClubBadge({ team }) {
+  const slug = CLUB_BADGES[team]
+  return slug ? <img className="club-badge" src={`https://assets.footylogos.com/previews/${slug}/${slug}-logo-footylogos-320.webp`} alt={`${team} crest`} /> : null
 }
 
 export default function App() {
@@ -247,9 +253,9 @@ export default function App() {
       {/* Brand Header */}
       <header className="header">
         <div className="brand">
-          <div className="brand-icon">🦁</div>
+          <img className="brand-icon" src="https://assets.footylogos.com/logos/premier-league-england/premier-league-england-logo-footylogos.svg" alt="Premier League" />
           <div>
-            <div className="brand-title">PREMIER LEAGUE PREDICTOR</div>
+            <div className="brand-title">Premier League forecast</div>
             <div className="brand-subtitle">
               <span>Season 2026/27</span>
               <span className="tag-badge">Monte Carlo (10k Runs)</span>
@@ -300,16 +306,16 @@ export default function App() {
               <span>Title Favorite</span>
               <Trophy size={16} color="#00ff87" />
             </div>
-            <div className="stat-value">{titleFavorite?.Team}</div>
+            <div className="stat-value"><ClubBadge team={titleFavorite?.Team} />{titleFavorite?.Team}</div>
             <div className="stat-sub">{titleFavorite?.['Title_%']}% Title Probability ({titleFavorite?.Exp_Pts} pts)</div>
           </div>
 
           <div className="stat-box top4-box">
             <div className="stat-label">
-              <span>Top 4 Lock</span>
+              <span>Top-four contender</span>
               <Award size={16} color="#00f0ff" />
             </div>
-            <div className="stat-value">{simData[1]?.Team}</div>
+            <div className="stat-value"><ClubBadge team={simData[1]?.Team} />{simData[1]?.Team}</div>
             <div className="stat-sub">{simData[1]?.['Top4_%']}% Champions League Odds</div>
           </div>
 
@@ -318,7 +324,7 @@ export default function App() {
               <span>Highest Relegation Risk</span>
               <AlertTriangle size={16} color="#ff3366" />
             </div>
-            <div className="stat-value">{relFavorite?.Team}</div>
+            <div className="stat-value"><ClubBadge team={relFavorite?.Team} />{relFavorite?.Team}</div>
             <div className="stat-sub">{relFavorite?.['Relegation_%']}% Chance of Relegation</div>
           </div>
 
@@ -343,7 +349,7 @@ export default function App() {
           className={`tab-btn ${activeTab === 'forecast' ? 'active' : ''}`}
           onClick={() => setActiveTab('forecast')}
         >
-          <Trophy size={16} /> Season Forecast (20 Teams)
+          <Trophy size={16} /> Season forecast
         </button>
 
         <button 
@@ -380,8 +386,8 @@ export default function App() {
         <div className="table-container">
           <div className="table-header">
             <div>
-              <div className="table-title">Simulated Final Standings & Probability Distribution</div>
-              <div style={{ fontSize: '12px', color: '#8e99b0', marginTop: '4px' }}>
+              <div className="table-title">How the season could finish</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
                 Based on 10,000 independent season simulations combining actual 2026/27 results + Dixon-Coles score sampling.
               </div>
             </div>
@@ -422,21 +428,13 @@ export default function App() {
                     </td>
                     <td>
                       <div className="team-cell">
-                        <span 
-                          style={{
-                            width: '10px',
-                            height: '10px',
-                            borderRadius: '50%',
-                            backgroundColor: CLUB_COLORS[row.Team] || '#fff',
-                            display: 'inline-block'
-                          }}
-                        />
+                        <ClubBadge team={row.Team} />
                         <span>{row.Team}</span>
                       </div>
                     </td>
-                    <td style={{ fontWeight: '700', color: '#fff' }}>{row.Exp_Pts}</td>
+                    <td style={{ fontWeight: '700', color: 'var(--text-main)' }}>{row.Exp_Pts}</td>
                     <td>{row.Exp_GD > 0 ? `+${row.Exp_GD}` : row.Exp_GD}</td>
-                    <td style={{ color: '#8e99b0' }}>{row.Exp_Rank}</td>
+                    <td style={{ color: 'var(--text-muted)' }}>{row.Exp_Rank}</td>
 
                     {/* Title % */}
                     <td className="prob-bar-cell">
@@ -472,7 +470,7 @@ export default function App() {
                       <div className="prob-bar-bg">
                         <div 
                           className="prob-bar-fill" 
-                          style={{ width: `${row['Top6_%']}%`, background: '#ffd166' }} 
+                          style={{ width: `${row['Top6_%']}%`, background: 'var(--gold)' }}
                         />
                       </div>
                     </td>
@@ -510,7 +508,7 @@ export default function App() {
                 value={homeTeam} 
                 onChange={(e) => setHomeTeam(e.target.value)}
               >
-                {(teams.length > 0 ? teams : Object.keys(CLUB_COLORS)).map(t => (
+                {(teams.length > 0 ? teams : Object.keys(CLUB_BADGES)).map(t => (
                   <option key={t} value={t} disabled={t === awayTeam}>{t}</option>
                 ))}
               </select>
@@ -525,7 +523,7 @@ export default function App() {
                 value={awayTeam} 
                 onChange={(e) => setAwayTeam(e.target.value)}
               >
-                {(teams.length > 0 ? teams : Object.keys(CLUB_COLORS)).map(t => (
+                {(teams.length > 0 ? teams : Object.keys(CLUB_BADGES)).map(t => (
                   <option key={t} value={t} disabled={t === homeTeam}>{t}</option>
                 ))}
               </select>
@@ -546,16 +544,16 @@ export default function App() {
 
           {prediction && !predicting && !predictionError && (
             <div className="prediction-result">
-              <div style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '1px', color: '#8e99b0' }}>
+              <div style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>
                 Dixon-Coles Expected Goals (xG)
               </div>
 
               <div className="xg-score">
-                <div className="xg-team">{prediction.home_team}</div>
+                <div className="xg-team"><ClubBadge team={prediction.home_team} />{prediction.home_team}</div>
                 <div className="xg-num">{prediction.home_xg}</div>
-                <div style={{ color: '#8e99b0', fontSize: '32px' }}>–</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '32px' }}>–</div>
                 <div className="xg-num" style={{ color: '#00b4d8' }}>{prediction.away_xg}</div>
-                <div className="xg-team">{prediction.away_team}</div>
+                <div className="xg-team"><ClubBadge team={prediction.away_team} />{prediction.away_team}</div>
               </div>
 
               {/* Probability Split Bar */}
@@ -580,15 +578,15 @@ export default function App() {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-around', fontSize: '13px', color: '#8e99b0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-around', fontSize: '13px', color: 'var(--text-muted)' }}>
                 <span>Home Win: <strong style={{ color: '#00b4d8' }}>{prediction.home_win_prob}%</strong></span>
-                <span>Draw: <strong style={{ color: '#fff' }}>{prediction.draw_prob}%</strong></span>
+                <span>Draw: <strong style={{ color: 'var(--text-main)' }}>{prediction.draw_prob}%</strong></span>
                 <span>Away Win: <strong style={{ color: '#e63946' }}>{prediction.away_win_prob}%</strong></span>
               </div>
 
               {/* Most likely scorelines */}
               <div style={{ marginTop: '28px' }}>
-                <div style={{ fontSize: '12px', textTransform: 'uppercase', color: '#8e99b0', letterSpacing: '0.8px', marginBottom: '12px' }}>
+                <div style={{ fontSize: '12px', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.8px', marginBottom: '12px' }}>
                   Most Likely Scorelines
                 </div>
                 <div className="scorelines-list">
@@ -604,7 +602,7 @@ export default function App() {
               {/* H2H Insights */}
               {prediction.h2h_insights && prediction.h2h_insights.length > 0 && (
                 <div style={{ marginTop: '36px', paddingTop: '24px', borderTop: '1px solid #23293b', textAlign: 'left' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', color: '#ffd166' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', color: 'var(--gold)' }}>
                     <Activity size={18} />
                     <span style={{ fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                       Head-to-Head Facts (Since 2024)
@@ -614,7 +612,7 @@ export default function App() {
                     {prediction.h2h_insights.map((fact, idx) => (
                       <li key={idx} style={{ 
                         fontSize: '14px', 
-                        color: '#f0f3f8', 
+                        color: 'var(--text-main)',
                         background: 'rgba(255, 255, 255, 0.03)',
                         padding: '12px 16px',
                         borderRadius: '8px',
@@ -636,7 +634,7 @@ export default function App() {
         <div className="table-container">
           <div className="table-header">
             <div className="table-title">Fitted Team Attack & Defense Strengths</div>
-            <div style={{ fontSize: '12px', color: '#8e99b0' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
               Estimates derived via Poisson MLE with a fitted Dixon-Coles low-score correction.
             </div>
           </div>
@@ -657,17 +655,17 @@ export default function App() {
                 <tr><td colSpan="4"><div className="table-state error-text">Team ratings are unavailable. Use “Try Again” above.</div></td></tr>
               ) : strengths.map(s => (
                 <tr key={s.Team}>
-                  <td style={{ fontWeight: '700' }}>{s.Team}</td>
-                  <td style={{ color: s.Attack_Strength > 0 ? '#00ff87' : '#e63946', fontWeight: '700' }}>
+                  <td style={{ fontWeight: '700' }}><div className="team-cell"><ClubBadge team={s.Team} />{s.Team}</div></td>
+                  <td style={{ color: s.Attack_Strength > 0 ? 'var(--primary)' : '#e63946', fontWeight: '700' }}>
                     {s.Attack_Strength > 0 ? `+${s.Attack_Strength}` : s.Attack_Strength}
                   </td>
-                  <td style={{ color: s.Defense_Weakness < 0.5 ? '#00f0ff' : '#ffd166' }}>
+                  <td style={{ color: s.Defense_Weakness < 0.5 ? 'var(--cyan)' : 'var(--gold)' }}>
                     {s.Defense_Weakness}
                   </td>
-                  <td style={{ color: '#8e99b0', fontSize: '12px' }}>
-                    {s.Attack_Strength > 0.05 ? '⚡ Elite Attack' : s.Attack_Strength > -0.1 ? '⚔️ Solid Attack' : '🛡️ Low Scoring'} 
+                  <td style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+                    {s.Attack_Strength > 0.05 ? 'Strong attack' : s.Attack_Strength > -0.1 ? 'Solid attack' : 'Low scoring'}
                     {' • '}
-                    {s.Defense_Weakness < 0.4 ? '🧱 Rock Solid Defense' : s.Defense_Weakness > 0.7 ? '⚠️ Leaky Defense' : 'Average Defense'}
+                    {s.Defense_Weakness < 0.4 ? 'Strong defence' : s.Defense_Weakness > 0.7 ? 'Vulnerable defence' : 'Average defence'}
                   </td>
                 </tr>
               ))}
@@ -684,7 +682,7 @@ export default function App() {
               Actual Premier League 2026/27 Results
               {seasonStatus ? ` (${seasonStatus.completed_matches} Matches Played)` : ''}
             </div>
-            <div style={{ fontSize: '12px', color: '#8e99b0' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
               {seasonStatus?.latest_result_date
                 ? `Results through ${new Date(`${seasonStatus.latest_result_date}T00:00:00`).toLocaleDateString()}.`
                 : 'Official results so far from football-data.co.uk before simulation.'}
@@ -714,7 +712,7 @@ export default function App() {
               ) : currentTable.map((r, i) => (
                 <tr key={r.Team}>
                   <td><span className="rank-badge">{i + 1}</span></td>
-                  <td style={{ fontWeight: '700' }}>{r.Team}</td>
+                  <td style={{ fontWeight: '700' }}><div className="team-cell"><ClubBadge team={r.Team} />{r.Team}</div></td>
                   <td>{r.Played}</td>
                   <td>{r.Wins}</td>
                   <td>{r.Draws}</td>
@@ -722,7 +720,7 @@ export default function App() {
                   <td>{r.GF}</td>
                   <td>{r.GA}</td>
                   <td>{r.GD > 0 ? `+${r.GD}` : r.GD}</td>
-                  <td style={{ fontWeight: '800', color: '#00ff87' }}>{r.Points}</td>
+                  <td style={{ fontWeight: '800', color: 'var(--primary)' }}>{r.Points}</td>
                 </tr>
               ))}
             </tbody>

@@ -1,0 +1,68 @@
+/* A restrained, paper-and-ink theme shared by every dashboard view. */
+:root {
+  --bg-main: #f7f7f2; --bg-card: #fff; --bg-card-hover: #f0f3ef;
+  --border: #dfe3dc; --border-active: #acb8ad;
+  --text-main: #202c26; --text-muted: #65716a;
+  --primary: #306b50; --cyan: #397479; --gold: #926b29;
+  --danger: #aa4949; --purple: #34314a; --purple-accent: #655477;
+  --ucl-badge: #397479; --uel-badge: #926b29; --rel-badge: #aa4949;
+  --primary-glow: transparent; --danger-glow: transparent;
+}
+body { font-family: 'Segoe UI', system-ui, sans-serif; }
+.fixture-selector, .prediction-result { border-radius: 4px; }
+.xg-score { align-items: center; flex-wrap: wrap; }
+.xg-team { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 500; }
+.xg-num { font-family: Georgia, serif; font-weight: 400; }
+.scoreline-goals { color: var(--text-main); }
+.segment-home { background: #397479; }
+.segment-draw { background: #737b72; }
+.segment-away { background: #a4554a; }
+.prob-split-bar { border-radius: 3px; }
+.app-container { max-width: 1320px; padding: 48px 32px 72px; }
+.header { padding-bottom: 30px; margin-bottom: 32px; }
+.brand { gap: 22px; }
+.brand-icon { width: 58px; height: 64px; object-fit: contain; border: 0; border-radius: 0; background: none; box-shadow: none; }
+.brand-title { font-family: Georgia, serif; font-size: 36px; font-weight: 400; letter-spacing: -1px; background: none; color: var(--text-main); -webkit-text-fill-color: currentColor; }
+.brand-subtitle { margin-top: 10px; flex-wrap: wrap; gap: 12px; }
+.tag-badge { background: transparent; border: 0; border-left: 1px solid var(--border); border-radius: 0; color: var(--text-muted); font-size: 11px; letter-spacing: .04em; }
+.stats-strip { gap: 0; background: #fff; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 32px; }
+.stat-box { border: 0; border-right: 1px solid var(--border); border-radius: 0; padding: 24px; background: transparent; }
+.stat-box:last-child { border-right: 0; }
+.stat-box::after { display: none; }
+.stat-label { font-size: 10px; letter-spacing: .09em; margin-bottom: 14px; }
+.stat-label svg { display: none; }
+.stat-value { color: var(--text-main); font-weight: 600; font-size: 24px; display: flex; align-items: center; gap: 10px; min-height: 32px; }
+.stat-sub { font-size: 12px; line-height: 1.6; margin-top: 10px; }
+.club-badge { width: 27px; height: 30px; object-fit: contain; flex-shrink: 0; }
+.tabs { gap: 18px; overflow-x: auto; }
+.tab-btn { padding: 14px 2px; border-radius: 0; white-space: nowrap; font-size: 13px; }
+.tab-btn svg { display: none; }
+.tab-btn.active, .tab-btn:hover { background: transparent; }
+.table-container, .card, .section-state, .evaluation-panel { border-radius: 4px; box-shadow: none; }
+.table-header { padding: 24px; }
+.table-title { font-family: Georgia, serif; font-weight: 400; font-size: 24px; }
+.league-table th { background: #f8faf7; color: var(--text-muted); font-size: 10px; letter-spacing: .06em; }
+.league-table td { padding-top: 17px; padding-bottom: 17px; font-size: 13px; border-bottom: 1px solid #edf0ea; font-variant-numeric: tabular-nums; }
+.league-table tbody tr { background: #fff; }
+.league-table tbody tr:hover { background: #f3f6f1; }
+.rank-badge { background: transparent !important; border: 0 !important; color: var(--text-muted) !important; font-weight: 500; }
+.team-cell { gap: 12px; font-weight: 600; }
+.prob-bar-bg { background: #eef1eb; height: 3px; margin-top: 8px; }
+.prob-bar-fill { border-radius: 0; }
+.error-banner { color: #803434; background: #fff2ef; border-color: #eccfc8; border-radius: 4px; }
+.server-banner { color: #28543e; background: #edf5ee; border-color: #d0e0d0; border-radius: 4px; }
+.retry-btn { color: var(--text-main); background: #fff; }
+.error-text { color: #963f3f; }
+select { background: white !important; color: var(--text-main) !important; border-color: var(--border) !important; }
+button:focus-visible, select:focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; }
+.metric-card, .scoreline-pill { background: #f5f7f2; border-color: var(--border); border-radius: 4px; box-shadow: none; }
+@media (max-width: 700px) {
+  .app-container { padding: 24px 16px 40px; }
+  .brand-title { font-size: 27px; }
+  .brand-icon { width: 40px; height: 48px; }
+  .brand { gap: 14px; }
+  .stats-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stat-box { padding: 16px; border-bottom: 1px solid var(--border); }
+  .stat-value { font-size: 19px; }
+  .table-title { font-size: 21px; }
+}

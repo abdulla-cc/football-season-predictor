@@ -7,7 +7,7 @@ const HEALTH_RETRY_DELAY_MS = 3_000
 
 const wait = (milliseconds) => new Promise(resolve => setTimeout(resolve, milliseconds))
 
-async function fetchJson(path, options, timeoutMs = 15_000) {
+async function fetchJson(path, options, timeoutMs = 120_000) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
   let response

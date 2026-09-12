@@ -15,6 +15,6 @@ services:
       - key: DATA_UPDATE_INTERVAL_HOURS
         value: "6"
       - key: CORS_ORIGINS
-        value: "*"
+        value: "https://football-season-predictor.vercel.app"
       - key: ADMIN_API_KEY
         generateValue: true

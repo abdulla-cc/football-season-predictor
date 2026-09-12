@@ -1,5 +1,6 @@
 import time
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 import src.api as api
 from src.api import health
@@ -66,3 +67,10 @@ def test_expensive_mutations_are_only_exposed_as_protected_admin_routes():
     assert "/api/admin/simulation/refresh" in routes
     assert routes["/api/admin/update-data"].dependant.dependencies
     assert routes["/api/admin/simulation/refresh"].dependant.dependencies
+
+
+def test_render_allows_only_the_production_frontend_origin():
+    render_config = Path("render.yaml").read_text(encoding="utf-8")
+
+    assert 'value: "https://football-season-predictor.vercel.app"' in render_config
+    assert 'value: "*"' not in render_config

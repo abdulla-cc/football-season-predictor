@@ -1,12 +1,13 @@
 import sys
 import os
 import asyncio
+import secrets
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pandas as pd
@@ -87,6 +88,14 @@ class MatchRequest(BaseModel):
     home_team: str
     away_team: str
 
+
+def require_admin_key(x_admin_key: str | None = Header(default=None)):
+    expected_key = os.getenv("ADMIN_API_KEY")
+    if not expected_key:
+        raise HTTPException(status_code=503, detail="Admin operations are not configured")
+    if not x_admin_key or not secrets.compare_digest(x_admin_key, expected_key):
+        raise HTTPException(status_code=401, detail="Invalid or missing admin key")
+
 @app.get("/api/health")
 def health():
     return {
@@ -102,9 +111,7 @@ def get_teams():
     return {"teams": teams}
 
 @app.get("/api/simulation")
-def get_simulation(refresh: bool = False):
-    if refresh and "simulation" in CACHE:
-        del CACHE["simulation"]
+def get_simulation():
     df = get_cached_simulation()
     return df.to_dict(orient="records")
 
@@ -134,7 +141,7 @@ def model_evaluation():
             CACHE["evaluation"] = evaluate_chronological_holdout(historical_matches)
         return CACHE["evaluation"]
 
-@app.post("/api/update-data")
+@app.post("/api/admin/update-data", dependencies=[Depends(require_admin_key)])
 def update_data():
     try:
         result = update_current_season_data()
@@ -143,6 +150,14 @@ def update_data():
         return result
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Data update failed: {exc}")
+
+
+@app.post("/api/admin/simulation/refresh", dependencies=[Depends(require_admin_key)])
+def refresh_simulation():
+    with COMPUTE_LOCK:
+        CACHE.pop("simulation", None)
+        simulation_df = get_cached_simulation()
+    return {"status": "refreshed", "teams": len(simulation_df)}
 
 @app.post("/api/predict-match")
 def predict(req: MatchRequest):

@@ -55,9 +55,6 @@ export default function App() {
   const [evaluation, setEvaluation] = useState(null)
   const [seasonStatus, setSeasonStatus] = useState(null)
   const [loadingSim, setLoadingSim] = useState(false)
-  const [updatingData, setUpdatingData] = useState(false)
-  const [dataUpdateMessage, setDataUpdateMessage] = useState('')
-  const [dataUpdateFailed, setDataUpdateFailed] = useState(false)
   const [loadingTable, setLoadingTable] = useState(true)
   const [loadingStrengths, setLoadingStrengths] = useState(false)
   const [loadingEvaluation, setLoadingEvaluation] = useState(false)
@@ -94,11 +91,11 @@ export default function App() {
     }
   }
 
-  const fetchSimulation = async (refresh = false) => {
+  const fetchSimulation = async () => {
     setLoadingSim(true)
     try {
       setRequestError('simulation')
-      const data = await fetchJson(`/api/simulation${refresh ? '?refresh=true' : ''}`)
+      const data = await fetchJson('/api/simulation')
       setSimData(data)
     } catch (e) {
       setRequestError('simulation', e)
@@ -158,34 +155,6 @@ export default function App() {
     } catch (e) {
       setRequestError('season status', e)
       console.error("Failed to load season status:", e)
-    }
-  }
-
-  const updateMatchData = async () => {
-    setUpdatingData(true)
-    setDataUpdateMessage('')
-    setDataUpdateFailed(false)
-    try {
-      const data = await fetchJson('/api/update-data', { method: 'POST' })
-
-      setDataUpdateMessage(
-        data.status === 'updated'
-          ? `Updated to ${data.completed_matches} completed matches.`
-          : `Already current: ${data.completed_matches} completed matches.`
-      )
-      setStrengths([])
-      setEvaluation(null)
-      await Promise.all([
-        fetchSimulation(),
-        fetchCurrentTable(),
-        fetchTeams(),
-        fetchSeasonStatus(),
-      ])
-    } catch (e) {
-      setDataUpdateFailed(true)
-      setDataUpdateMessage(e.message)
-    } finally {
-      setUpdatingData(false)
     }
   }
 
@@ -259,29 +228,6 @@ export default function App() {
           </div>
         </div>
 
-        <div className="header-actions">
-          <button
-            className="secondary-btn"
-            onClick={updateMatchData}
-            disabled={updatingData || loadingSim}
-          >
-            <RefreshCw size={16} className={updatingData ? 'spin' : ''} />
-            {updatingData ? 'Updating Results...' : 'Update Match Data'}
-          </button>
-          <button
-            className="sim-btn"
-            onClick={() => fetchSimulation(true)}
-            disabled={loadingSim || updatingData}
-          >
-            <RefreshCw size={16} className={loadingSim ? 'spin' : ''} />
-            {loadingSim ? 'Simulating 10,000 Seasons...' : 'Re-Run Simulation'}
-          </button>
-          {dataUpdateMessage && (
-            <div className={`data-update-message ${dataUpdateFailed ? 'failed' : ''}`} role={dataUpdateFailed ? 'alert' : undefined}>
-              {dataUpdateMessage}
-            </div>
-          )}
-        </div>
       </header>
 
       {Object.keys(requestErrors).length > 0 && (

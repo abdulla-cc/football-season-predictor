@@ -139,16 +139,18 @@ The updater validates the schema and team count, refuses older datasets, and cre
 | `GET` | `/api/current-table` | Standings from completed matches |
 | `GET` | `/api/team-strengths` | Fitted attack and defence ratings |
 | `GET` | `/api/evaluation` | Historical backtest metrics |
-| `GET` | `/api/simulation` | Cached full-season forecast |
+| `GET` | `/api/simulation` | Public cached full-season forecast |
 | `POST` | `/api/predict-match` | Individual fixture prediction |
-| `POST` | `/api/update-data` | Download and validate current results |
+| `POST` | `/api/admin/update-data` | Protected current-results update |
+| `POST` | `/api/admin/simulation/refresh` | Protected simulation refresh |
+
+Admin endpoints require the `X-Admin-Key` request header. The key is generated and stored by Render and is never included in frontend code or source control.
 
 ## Current limitations
 
 - Forecast quality is limited by the model features and available match history.
 - Injuries, transfers, lineups, player-level data, and expected-goals feeds are not included.
 - The Render free service can be slow on the first request after inactivity.
-- Expensive refresh endpoints still need access protection and rate limiting.
 - The API currently permits cross-origin requests broadly until production CORS is restricted.
 - La Liga and Serie A are planned but not implemented.
 

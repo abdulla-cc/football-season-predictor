@@ -226,59 +226,6 @@ body {
   font-weight: 700;
 }
 
-.sim-btn {
-  background: linear-gradient(135deg, var(--primary) 0%, #00b4d8 100%);
-  color: #0b0e14;
-  font-weight: 700;
-  font-size: 13px;
-  border: none;
-  padding: 9px 18px;
-  border-radius: 8px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: transform 0.15s, box-shadow 0.15s;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.secondary-btn {
-  background: transparent;
-  color: var(--cyan);
-  font-weight: 700;
-  font-size: 13px;
-  border: 1px solid var(--cyan);
-  padding: 8px 16px;
-  border-radius: 8px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.secondary-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.data-update-message {
-  flex-basis: 100%;
-  color: var(--text-muted);
-  font-size: 12px;
-  text-align: right;
-}
-
-.data-update-message.failed {
-  color: #ff8da6;
-}
-
 .error-banner {
   display: flex;
   align-items: center;
@@ -345,16 +292,6 @@ body {
     align-items: flex-start;
     flex-direction: column;
   }
-}
-
-.sim-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 15px var(--primary-glow);
-}
-
-.sim-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 .league-table {

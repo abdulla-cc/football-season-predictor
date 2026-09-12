@@ -3,6 +3,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 import src.api as api
 from src.api import health
+from fastapi import HTTPException
+import pytest
 
 
 def test_health_response_identifies_the_service():
@@ -32,3 +34,35 @@ def test_concurrent_model_requests_train_only_once(monkeypatch):
     assert len(trained_models) == 1
     assert models[0] is models[1]
     api.CACHE.clear()
+
+
+def test_admin_key_is_required(monkeypatch):
+    monkeypatch.setenv("ADMIN_API_KEY", "test-admin-key")
+
+    with pytest.raises(HTTPException) as missing:
+        api.require_admin_key(None)
+    assert missing.value.status_code == 401
+
+    with pytest.raises(HTTPException) as incorrect:
+        api.require_admin_key("wrong-key")
+    assert incorrect.value.status_code == 401
+
+    assert api.require_admin_key("test-admin-key") is None
+
+
+def test_admin_operations_fail_closed_without_configuration(monkeypatch):
+    monkeypatch.delenv("ADMIN_API_KEY", raising=False)
+
+    with pytest.raises(HTTPException) as error:
+        api.require_admin_key("any-key")
+    assert error.value.status_code == 503
+
+
+def test_expensive_mutations_are_only_exposed_as_protected_admin_routes():
+    routes = {route.path: route for route in api.app.routes if hasattr(route, "methods")}
+
+    assert "/api/update-data" not in routes
+    assert "/api/admin/update-data" in routes
+    assert "/api/admin/simulation/refresh" in routes
+    assert routes["/api/admin/update-data"].dependant.dependencies
+    assert routes["/api/admin/simulation/refresh"].dependant.dependencies
